@@ -60,19 +60,30 @@ def server_layout():
         html.Div(
             dcc.Tabs(id="menu-tabs", value='menu', children=[
                 dcc.Tab(id="applet-tab", label='Applet',children=[
+                    html.Div(dcc.Dropdown(id="Wavelength", placeholder="Wavelength"),
+                             style={'display': 'inline-block', 'width': '16.6%'}),
+                    html.Div(dcc.Dropdown(id="ThetaI", placeholder="Incidence zenith angle"),
+                             style={'display': 'inline-block', 'width': '16.6%'}),
+                    html.Div(dcc.Dropdown(id="PhiI", placeholder="Incidence azimuthal angle"),
+                             style={'display': 'inline-block', 'width': '16.6%'}),
+                    html.Div(dcc.Dropdown(id="Polarization", placeholder="Polarization"),
+                             style={'display': 'inline-block', 'width': '16.6%'}),
+                    html.Div(dcc.Dropdown(id="Observer", placeholder="Observer"),
+                             style={'display': 'inline-block', 'width': '16.6%'}),
+                    html.Div(dcc.Dropdown(id="Illuminant", placeholder="Illuminant"),
+                             style={'display': 'inline-block', 'width': '16.6%'}),
+
                     dcc.Tabs(id="applet-modes", value='menu-1', children=[
                              dcc.Tab(id="applet-BRDF", label='BRDF visualisation', value='BRDF', children=[
-                                 html.Div(dcc.Dropdown(id="Wavelength", placeholder="Wavelength"), style={'display': 'inline-block', 'width': '16.6%'}),
-                                 html.Div(dcc.Dropdown(id="ThetaI", placeholder="Incidence zenith angle"), style={'display': 'inline-block', 'width': '16.6%'}),
-                                 html.Div(dcc.Dropdown(id="PhiI", placeholder="Incidence azimuthal angle"), style={'display': 'inline-block', 'width': '16.6%'}),
-                                 html.Div(dcc.Dropdown(id="Polarization", placeholder="Polarization"), style={'display': 'inline-block', 'width': '16.6%'}),
-                                 html.Div(dcc.Dropdown(id="Observer", placeholder="Observer"), style={'display': 'inline-block', 'width': '16.6%'}),
-                                 html.Div(dcc.Dropdown(id="Illuminant", placeholder="Illuminant"), style={'display': 'inline-block', 'width': '16.6%'}),
-                                 html.Div(dcc.Graph(id="3D-plot"), style={'display': 'inline-block', 'width': '50%'}),
+                                  html.Div(dcc.Graph(id="3D-plot"), style={'display': 'inline-block', 'width': '50%'}),
                                  html.Div(dcc.Graph(id="Point-spectrum"), style={'display': 'inline-block', 'width': '50%'}),
                                  html.Div(dcc.Graph(id="Projection-plot"), style={'display': 'inline-block', 'width': '50%'}),
                                  html.Div(dcc.Graph(id="2D-BRDF"), style={'display': 'inline-block', 'width': '50%'})]),
-                             dcc.Tab(id="applet-COLOR", label='Color', value='Color', children=dcc.Graph())]
+                             dcc.Tab(id="applet-COLOR", label='CIELAB', value='CIELAB', children=[
+                                 html.Div(dcc.Graph(id="CIELAB-3Dplot"), style={'display': 'inline-block', 'width': '50%'}),
+                                 html.Div(dcc.Graph(id="CIEAB-plot"), style={'display': 'inline-block', 'width': '50%'}),
+                                 html.Div(dcc.Graph(id="CIELAB-plot"), style={'display': 'inline-block', 'width': '50%'}),
+                                ])]
                              )]
                         ),
                 dcc.Tab(id="help-tab", label='Help',value='menu-2', children=html.Div(children='''Here is help text'''))])
@@ -158,10 +169,19 @@ def update_3D_plot(wl, thI, phiI, pol, observer, illuminant, data):
 
     tristimulus_values, RGB_values = get_tristimulus_XYZs(thI,phiI,pol,data,observer,illuminant)
 
-    # print(sRGB_values)
+    # print(tristimulus_values)
     # print(X.shape,Y.shape,Z.shape)
 
-    figure = go.Figure(data=[go.Surface(x=X, y=Y, z=Z)])
+    figure = go.Figure()
+    figure.add_trace(go.Surface(x=X, y=Y, z=Z))
+
+    figure.update_layout(title="BRDF 3D plot",
+        scene=dict(
+            xaxis_title="Theta (deg)",
+            yaxis_title="Theta (deg)",
+            zaxis_title="Radiance factor"
+        )
+    )
 
     return Z, tristimulus_values, RGB_values, figure
 
@@ -193,15 +213,21 @@ def update_projection_plot(figure, data, RGB_values):
                 delta_r = 0
             if theta >= 0:
                 figure.add_trace(go.Barpolar(
+                    name = str(theta),
                     r=[delta_r],
                     theta=[phi],
                     marker_color='rgb('+str(RGB_color[0])+','+str(RGB_color[1])+','+str(RGB_color[2])+')'))
             elif theta < 0:
                 figure.add_trace(go.Barpolar(
+                    name=str(theta),
                     r=[delta_r],
                     theta=[180+phi],
                     marker_color='rgb('+str(RGB_color[0])+','+str(RGB_color[1])+','+str(RGB_color[2])+')'))
         previous_radius = radius
+
+        figure.update_layout(
+            title="BRDF polar representation"
+        )
 
             # if theta < 0:
             #     figure.add_trace(pgo.Barpolar(
@@ -267,12 +293,18 @@ def update_2D_brdf_plot(fig, relayoutData, data, selected_data):
     print(selected_phiVs)
 
     if phis[phi_mask].shape[0] == 1:
-        figure.add_trace(go.Scatter(x = x, y = y[0], mode='lines+markers'))
+        figure.add_trace(go.Scatter(name='BRDF',x = x, y = y[0], mode='lines+markers'))
     elif phis[phi_mask].shape[0] == 2:
-        figure.add_trace(go.Scatter(x = x, y = y[0], mode='lines+markers'))
-        figure.add_trace(go.Scatter(x = -x, y = y[1], mode='lines+markers'))
+        figure.add_trace(go.Scatter(name='BRDF 0 to 90',x = x, y = y[0], mode='lines+markers'))
+        figure.add_trace(go.Scatter(name='BRDF -90 to 0',x = -x, y = y[1], mode='lines+markers'))
     else:
         raise PreventUpdate
+
+    figure.update_layout(
+        title="BRDF 2D plot at selected viewing azimuth",
+        xaxis_title='Viewing zenith angle Theta (deg)',
+        yaxis_title='Radiance factor'
+    )
 
     return figure, selected_phiVs
 
@@ -313,6 +345,132 @@ def update_Spectrum_plot(clickData, fig, data, ThetaI, PhiI, Polarization, selec
 
     figure = go.Figure()
     figure.add_trace(go.Scatter(x = x, y = y[0], mode='lines+markers'))
+
+    figure.update_layout(
+        title="Reflectance spectr at selected viewing zenith and azimuth",
+        xaxis_title='Wavelength (nm)',
+        yaxis_title='Radiance factor'
+    )
+    return figure
+
+@app.callback(Output('CIELAB-3Dplot','figure'),
+              [Input('Point-spectrum','figure')],
+              [State('tristimulus_XYZ_values','data'),
+               State('selected_phiv','data'),
+               State('browser_data_storage','data')])
+def update_CIELAB_3Dplot(fig, tristimulus_XYZ, selected_phi, data):
+    if fig is None or tristimulus_XYZ is None or selected_phi is None:
+        raise PreventUpdate
+
+    selected_phi = np.array(selected_phi)
+    phiVs = np.array(data['phiVs'])
+    tristimulus_XYZ = np.array(tristimulus_XYZ)
+
+    figure = go.Figure()
+
+    if selected_phi.shape[0] == 1:
+        selected_XYZ = tristimulus_XYZ[:, phiVs == selected_phi[0]][:,0,:]
+        selected_LAB = np.array([clr.XYZ_to_Lab(selected_XYZ[i]/100) for i in range(selected_XYZ.shape[0])])
+        figure.add_trace(go.Scatter3d(x=selected_LAB[:,1], y=selected_LAB[:,2], z=selected_LAB[:,0], mode='lines+markers'))
+    elif selected_phi.shape[0] == 2:
+        selected_XYZ_pos = tristimulus_XYZ[:, phiVs == selected_phi[0]][:,0,:]
+        selected_LAB_pos = np.array([clr.XYZ_to_Lab(selected_XYZ_pos[i]/100) for i in range(selected_XYZ_pos.shape[0])])
+        figure.add_trace(go.Scatter3d(x=selected_LAB_pos[:, 1], y=selected_LAB_pos[:, 2], z=selected_LAB_pos[:, 0], mode='lines+markers'))
+        selected_XYZ_neg = tristimulus_XYZ[:, phiVs == selected_phi[1]][:,0,:]
+        selected_XYZ_neg = np.array([clr.XYZ_to_Lab(selected_XYZ_neg[i]/100) for i in range(selected_XYZ_neg.shape[0])])
+        figure.add_trace(go.Scatter3d(x=selected_XYZ_neg[:, 1], y=selected_XYZ_neg[:, 2], z=selected_XYZ_neg[:, 0], mode='lines+markers'))
+    else:
+        raise PreventUpdate
+
+    figure.update_layout(title="Color travel 3D plot in CIELab space",
+                         scene=dict(
+                             xaxis_title="a*",
+                             yaxis_title="b*",
+                             zaxis_title="L*"
+                         )
+                    )
+
+    return figure
+
+@app.callback(Output('CIEAB-plot','figure'),
+              [Input('CIELAB-3Dplot','figure')],
+              [State('tristimulus_XYZ_values','data'),
+               State('selected_phiv','data'),
+               State('browser_data_storage','data')])
+def update_CIELAB_3Dplot(fig, tristimulus_XYZ, selected_phi, data):
+    if fig is None or tristimulus_XYZ is None or selected_phi is None:
+        raise PreventUpdate
+
+    selected_phi = np.array(selected_phi)
+    phiVs = np.array(data['phiVs'])
+    tristimulus_XYZ = np.array(tristimulus_XYZ)
+
+    figure = go.Figure()
+
+    if selected_phi.shape[0] == 1:
+        selected_XYZ = tristimulus_XYZ[:, phiVs == selected_phi[0]][:,0,:]
+        selected_LAB = np.array([clr.XYZ_to_Lab(selected_XYZ[i]/100) for i in range(selected_XYZ.shape[0])])
+        figure.add_trace(go.Scatter(name='projection',x=selected_LAB[:,1], y=selected_LAB[:,2], mode='lines+markers'))
+    elif selected_phi.shape[0] == 2:
+        selected_XYZ_pos = tristimulus_XYZ[:, phiVs == selected_phi[0]][:,0,:]
+        selected_LAB_pos = np.array([clr.XYZ_to_Lab(selected_XYZ_pos[i]/100) for i in range(selected_XYZ_pos.shape[0])])
+        figure.add_trace(go.Scatter(name='projection 0 to 90',x=selected_LAB_pos[:, 1], y=selected_LAB_pos[:, 2], mode='lines+markers'))
+        selected_XYZ_neg = tristimulus_XYZ[:, phiVs == selected_phi[1]][:,0,:]
+        selected_XYZ_neg = np.array([clr.XYZ_to_Lab(selected_XYZ_neg[i]/100) for i in range(selected_XYZ_neg.shape[0])])
+        figure.add_trace(go.Scatter(name='projection -90 to 0',x=selected_XYZ_neg[:, 1], y=selected_XYZ_neg[:, 2], mode='lines+markers'))
+    else:
+        raise PreventUpdate
+
+    figure.update_layout(
+        title="CIELab colorspace projection to a*b* plane",
+        xaxis_title='a*',
+        yaxis_title='b*'
+    )
+
+    return figure
+
+@app.callback(Output('CIELAB-plot','figure'),
+              [Input('CIEAB-plot','figure')],
+              [State('tristimulus_XYZ_values','data'),
+               State('selected_phiv','data'),
+               State('browser_data_storage','data')])
+def update_CIELAB_3Dplot(fig, tristimulus_XYZ, selected_phi, data):
+    if fig is None or tristimulus_XYZ is None or selected_phi is None:
+        raise PreventUpdate
+
+    selected_phi = np.array(selected_phi)
+    phiVs = np.array(data['phiVs'])
+    thetaVs = np.array(data['thetaVs'])
+    tristimulus_XYZ = np.array(tristimulus_XYZ)
+
+    figure = go.Figure()
+
+    if selected_phi.shape[0] == 1:
+        selected_XYZ = tristimulus_XYZ[:, phiVs == selected_phi[0]][:,0,:]
+        selected_LAB = np.array([clr.XYZ_to_Lab(selected_XYZ[i]/100) for i in range(selected_XYZ.shape[0])])
+        figure.add_trace(go.Scatter(name='L*',y=selected_LAB[:,0], x=thetaVs, mode='lines+markers',marker=dict(color='yellow'),line=dict(color='yellow')))
+        figure.add_trace(go.Scatter(name='a*',y=selected_LAB[:, 1], x=thetaVs, mode='lines+markers',marker=dict(color='red'),line=dict(color='red')))
+        figure.add_trace(go.Scatter(name='b*',y=selected_LAB[:, 2], x=thetaVs, mode='lines+markers',marker=dict(color='blue'),line=dict(color='blue')))
+    elif selected_phi.shape[0] == 2:
+        selected_XYZ_pos = tristimulus_XYZ[:, phiVs == selected_phi[0]][:,0,:]
+        selected_LAB_pos = np.array([clr.XYZ_to_Lab(selected_XYZ_pos[i]/100) for i in range(selected_XYZ_pos.shape[0])])
+        figure.add_trace(go.Scatter(name='L* 0 to 90',y=selected_LAB_pos[:, 0], x=thetaVs, mode='lines+markers', marker=dict(color='yellow'),line=dict(color='yellow')))
+        figure.add_trace(go.Scatter(name='a* 0 to 90',y=selected_LAB_pos[:, 1], x=thetaVs, mode='lines+markers', marker=dict(color='red'),line=dict(color='red')))
+        figure.add_trace(go.Scatter(name='b* 0 to 90',y=selected_LAB_pos[:, 2], x=thetaVs, mode='lines+markers', marker=dict(color='blue'),line=dict(color='blue')))
+        selected_XYZ_neg = tristimulus_XYZ[:, phiVs == selected_phi[1]][:,0,:]
+        selected_XYZ_neg = np.array([clr.XYZ_to_Lab(selected_XYZ_neg[i]/100) for i in range(selected_XYZ_neg.shape[0])])
+        figure.add_trace(go.Scatter(name='L* -90 to 0',y=selected_XYZ_neg[:, 0], x=-thetaVs, mode='lines+markers',marker=dict(color='yellow'),line=dict(color='yellow')))
+        figure.add_trace(go.Scatter(name='a* -90 to 0',y=selected_XYZ_neg[:, 1], x=-thetaVs, mode='lines+markers',marker=dict(color='red'),line=dict(color='red')))
+        figure.add_trace(go.Scatter(name='b* -90 to 0',y=selected_XYZ_neg[:, 2], x=-thetaVs, mode='lines+markers',marker=dict(color='blue'),line=dict(color='blue')))
+    else:
+        raise PreventUpdate
+
+    figure.update_layout(
+        title="CIELab values dependence on viewing zenith angle",
+        xaxis_title='CIELab units',
+        yaxis_title='Viewing zenith angle Theta (deg)'
+    )
+
     return figure
 
 app.layout = server_layout()
